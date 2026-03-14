@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EdgeIQ — Real-Time Arbitrage</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{--cyan:#00f0ff;--purple:#7000ff;--green:#00ff88;--bg:#050505;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,240,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,0.04) 1px,transparent 1px);background-size:40px 40px;animation:gridScroll 20s linear infinite;pointer-events:none;z-index:0;}
+    body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 20%,rgba(112,0,255,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(0,240,255,0.06) 0%,transparent 60%);pointer-events:none;z-index:0;}
+    @keyframes gridScroll{0%{background-position:0 0;}100%{background-position:40px 40px;}}
+    .glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);}
+    .glass-strong{background:rgba(255,255,255,0.06);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.12);}
+    .gradient-text{background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    #navbar{position:sticky;top:0;z-index:100;background:rgba(5,5,5,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(0,240,255,0.12);}
+    .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0;}
+    .status-dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulseDot 2s ease-in-out infinite;}
+    .status-dot.offline{background:#ef4444;box-shadow:0 0 8px #ef4444;}
+    @keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.35;}}
+    #ticker-wrap{overflow:hidden;white-space:nowrap;background:rgba(0,240,255,0.03);border-bottom:1px solid rgba(0,240,255,0.08);padding:6px 0;position:relative;z-index:1;}
+    #ticker-inner{display:inline-block;animation:tickerAnim 50s linear infinite;padding-left:50px;}
+    #ticker-inner:hover{animation-play-state:paused;}
+    @keyframes tickerAnim{0%{transform:translateX(100vw);}100%{transform:translateX(-100%);}}
+    #offline-banner{display:none;background:linear-gradient(90deg,rgba(234,179,8,0.18),rgba(234,179,8,0.08));border-top:1px solid rgba(234,179,8,0.35);border-bottom:1px solid rgba(234,179,8,0.35);padding:10px 20px;text-align:center;color:#fbbf24;font-size:0.875rem;font-weight:500;position:relative;z-index:1;}
+    #offline-banner.show{display:block;}
+    .profit-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.3);color:var(--green);font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;padding:3px 10px;border-radius:20px;}
+    .profit-badge.hot{box-shadow:0 0 14px rgba(0,255,136,0.45);background:rgba(0,255,136,0.2);border-color:rgba(0,255,136,0.55);}
+    .sport-badge{font-size:0.67rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:12px;background:rgba(112,0,255,0.2);border:1px solid rgba(112,0,255,0.38);color:rgba(200,150,255,0.9);}
+    .arb-card{position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);transition:transform 0.2s ease,border-color 0.3s ease;background:rgba(255,255,255,0.03);}
+    .arb-card:hover{transform:translateY(-2px);border-color:rgba(0,240,255,0.22);}
+    .arb-card .shimmer-layer{position:absolute;top:-50%;left:-75%;width:50%;height:200%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.055),transparent);transform:skewX(-15deg);transition:left 0.55s ease;pointer-events:none;z-index:2;}
+    .arb-card:hover .shimmer-layer{left:125%;}
+    @keyframes newFlash{0%{box-shadow:0 0 0 0 rgba(0,255,136,0.7);border-color:rgba(0,255,136,0.65);}50%{box-shadow:0 0 22px 6px rgba(0,255,136,0.25);}100%{box-shadow:none;border-color:rgba(255,255,255,0.08);}}
+    .arb-card.new-flash{animation:newFlash 1.8s ease-out forwards;}
+    .bookie-chip{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.58rem;font-weight:700;flex-shrink:0;text-transform:uppercase;letter-spacing:0.02em;}
+    .bet-btn-cyan{background:linear-gradient(135deg,rgba(0,240,255,0.18),rgba(0,240,255,0.08));border:1px solid rgba(0,240,255,0.35);color:var(--cyan);font-size:0.73rem;font-weight:600;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all 0.2s ease;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .bet-btn-cyan:hover{background:linear-gradient(135deg,rgba(0,240,255,0.32),rgba(0,240,255,0.18));box-shadow:0 0 14px rgba(0,240,255,0.28);}
+    .bet-btn-purple{background:linear-gradient(135deg,rgba(112,0,255,0.22),rgba(112,0,255,0.12));border:1px solid rgba(112,0,255,0.4);color:#c084fc;font-size:0.73rem;font-weight:600;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all 0.2s ease;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .bet-btn-purple:hover{background:linear-gradient(135deg,rgba(112,0,255,0.38),rgba(112,0,255,0.22));box-shadow:0 0 14px rgba(112,0,255,0.32);}
+    .filter-pill{padding:5px 14px;border-radius:20px;font-size:0.77rem;font-weight:500;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#94a3b8;transition:all 0.2s ease;white-space:nowrap;}
+    .filter-pill:hover{border-color:rgba(0,240,255,0.3);color:#e2e8f0;}
+    .filter-pill.active{background:linear-gradient(135deg,rgba(0,240,255,0.14),rgba(112,0,255,0.14));border-color:rgba(0,240,255,0.42);color:var(--cyan);}
+    .view-btn{padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#64748b;cursor:pointer;transition:all 0.2s ease;}
+    .view-btn.active{background:rgba(0,240,255,0.1);border-color:rgba(0,240,255,0.35);color:var(--cyan);}
+    input[type="range"]{-webkit-appearance:none;width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none;}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));cursor:pointer;box-shadow:0 0 8px rgba(0,240,255,0.5);}
+    input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));cursor:pointer;border:none;box-shadow:0 0 8px rgba(0,240,255,0.5);}
+    .edge-input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#e2e8f0;padding:7px 12px;font-family:'Inter',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.2s;width:100%;}
+    .edge-input:focus{border-color:rgba(0,240,255,0.4);box-shadow:0 0 0 2px rgba(0,240,255,0.07);}
+    .edge-select{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#e2e8f0;padding:7px 12px;font-family:'Inter',sans-serif;font-size:0.85rem;outline:none;cursor:pointer;transition:border-color 0.2s;}
+    .edge-select:focus{border-color:rgba(0,240,255,0.4);}
+    .edge-select option{background:#0f1117;}
+    .refresh-btn{background:linear-gradient(135deg,rgba(0,240,255,0.14),rgba(112,0,255,0.14));border:1px solid rgba(0,240,255,0.3);color:var(--cyan);padding:8px 18px;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.2s ease;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+    .refresh-btn:hover{background:linear-gradient(135deg,rgba(0,240,255,0.24),rgba(112,0,255,0.24));box-shadow:0 0 16px rgba(0,240,255,0.2);}
+    .refresh-btn:active{transform:scale(0.97);}
+    @keyframes spin{100%{transform:rotate(360deg);}}
+    .spinning{animation:spin 0.8s linear infinite;}
+    .skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 100%);background-size:200% 100%;animation:shimmerAnim 1.6s ease-in-out infinite;border-radius:6px;}
+    @keyframes shimmerAnim{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+    .stat-val{font-family:'JetBrains Mono',monospace;font-size:1.25rem;font-weight:700;line-height:1.3;}
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:rgba(0,240,255,0.18);border-radius:3px;}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(0,240,255,0.32);}
+    .num{font-family:'JetBrains Mono',monospace;}
+    #main-content{position:relative;z-index:1;}
+    .edge-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,240,255,0.14),transparent);margin:10px 0;}
+    .stake-prefix{background:rgba(0,240,255,0.08);border:1px solid rgba(255,255,255,0.1);border-right:none;border-radius:8px 0 0 8px;padding:7px 10px;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;}
+    .stake-input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:0 8px 8px 0;color:#e2e8f0;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;outline:none;width:88px;}
+    .stake-input:focus{border-color:rgba(0,240,255,0.4);}
+    .card-inner{position:relative;z-index:1;padding:16px;}
+    .leg-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);}
+    .empty-state{text-align:center;padding:60px 20px;}
+    .grid-layout{display:grid;grid-template-columns:1fr;gap:16px;}
+    @media(min-width:768px){.grid-layout{grid-template-columns:1fr 1fr;}}
+    @media(min-width:1280px){.grid-layout{grid-template-columns:1fr 1fr 1fr;}}
+    .list-layout{display:flex;flex-direction:column;gap:12px;}
+    .list-layout .arb-card .card-inner{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+    .list-layout .card-header-area{flex:0 0 200px;min-width:160px;}
+    .list-layout .card-legs-area{flex:1;min-width:220px;}
+    .list-layout .card-summary-area{flex:0 0 170px;min-width:150px;}
+    .list-layout .card-actions-area{flex:0 0 150px;min-width:140px;display:flex;flex-direction:column;gap:8px;justify-content:center;}
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav id="navbar" class="px-4 py-3">
+  <div class="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+        <defs>
+          <linearGradient id="boltG" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00f0ff"/>
+            <stop offset="100%" stop-color="#7000ff"/>
+          </linearGradient>
+        </defs>
+        <polygon points="18,2 6,18 14,18 14,30 26,14 18,14" fill="url(#boltG)"/>
+      </svg>
+      <div>
+        <div class="text-xl font-extrabold gradient-text tracking-tight leading-none">EdgeIQ</div>
+        <div class="text-xs text-slate-600 font-mono leading-none mt-0.5" style="font-size:0.65rem;letter-spacing:0.12em;">ARBITRAGE ENGINE</div>
+      </div>
+    </div>
+
+    <div class="hidden md:flex items-center gap-6 text-sm font-medium">
+      <a href="#" style="color:var(--cyan);border-bottom:2px solid var(--cyan);padding-bottom:2px;font-size:0.875rem;font-weight:600;">Real-Time Arbitrage</a>
+      <span class="text-slate-600 cursor-default" style="font-size:0.875rem;">Middles <span class="text-slate-700 text-xs">Soon</span></span>
+      <span class="text-slate-600 cursor-default" style="font-size:0.875rem;">EV Bets <span class="text-slate-700 text-xs">Soon</span></span>
+      <span class="text-slate-600 cursor-default" style="font-size:0.875rem;">Portfolio <span class="text-slate-700 text-xs">Soon</span></span>
+    </div>
+
+    <div class="flex items-center gap-3 flex-shrink-0 flex-wrap">
+      <div class="flex items-center gap-1.5">
+        <span id="status-dot" class="status-dot offline"></span>
+        <span id="status-text" class="font-mono font-bold text-xs text-red-400">OFFLINE</span>
+      </div>
+      <div id="update-timer" class="hidden text-xs font-mono text-slate-500">Updated <span id="update-seconds">0</span>s ago</div>
+      <div id="api-credits-wrap" class="hidden">
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-xs font-mono">
+          <span class="text-slate-500">Credits</span>
+          <span id="credits-val" class="font-bold" style="color:var(--cyan)">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- TICKER -->
+<div id="ticker-wrap">
+  <div id="ticker-inner" class="text-xs font-mono text-slate-400">
+    <span id="ticker-text" class="italic text-slate-500">⚡ Connecting to EdgeIQ backend...</span>
+  </div>
+</div>
+
+<!-- OFFLINE BANNER -->
+<div id="offline-banner">
+  ⚠️ &nbsp;Backend not running — In the project folder run:
+  <code style="font-family:'JetBrains Mono',monospace;background:rgba(120,80,0,0.3);padding:2px 8px;border-radius:4px;color:#fde68a;margin-left:6px;">node server.js</code>
+</div>
+
+<!-- MAIN -->
+<div id="main-content" class="max-w-7xl mx-auto px-4 pb-14 pt-5">
+
+  <!-- STATS BAR -->
+  <div class="flex flex-wrap items-center gap-4 mb-5">
+    <div class="glass rounded-xl px-5 py-3 flex items-center gap-5 flex-1 min-w-0 flex-wrap">
+      <div>
+        <div class="text-xs text-slate-500 uppercase tracking-widest font-medium mb-0.5">Active Arbs</div>
+        <div id="stat-count" class="stat-val" style="color:var(--green)">0</div>
+      </div>
+      <div class="w-px bg-white/10 self-stretch hidden sm:block" style="min-height:32px;"></div>
+      <div>
+        <div class="text-xs text-slate-500 uppercase tracking-widest font-medium mb-0.5">Best Profit</div>
+        <div id="stat-best" class="stat-val text-white">—</div>
+      </div>
+      <div class="w-px bg-white/10 self-stretch hidden sm:block" style="min-height:32px;"></div>
+      <div>
+        <div class="text-xs text-slate-500 uppercase tracking-widest font-medium mb-0.5">Avg Profit</div>
+        <div id="stat-avg" class="stat-val" style="color:var(--cyan)">—</div>
+      </div>
+    </div>
+    <button class="refresh-btn" onclick="refreshNow()" id="refresh-btn">
+      <svg id="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Refresh Now
+    </button>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="glass-strong rounded-xl p-4 mb-5">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <div id="sport-pills" class="flex flex-wrap gap-2"></div>
+      <div class="flex-1 min-w-36">
+        <input type="text" id="search-input" class="edge-input" placeholder="🔍  Search match..." oninput="applyFilters()" />
+      </div>
+      <select id="sort-select" class="edge-select" onchange="applyFilters()">
+        <option value="profit">↑ Best Profit</option>
+        <option value="time">🕐 Soonest Game</option>
+        <option value="sport">🏅 By Sport</option>
+      </select>
+    </div>
+    <div class="edge-divider"></div>
+    <div class="flex flex-wrap items-center gap-5 mt-2">
+      <div class="flex gap-1">
+        <button id="view-grid" class="view-btn active" onclick="setView('grid')" title="Grid">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </button>
+        <button id="view-list" class="view-btn" onclick="setView('list')" title="List">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1.5" fill="currentColor"/><circle cx="3" cy="12" r="1.5" fill="currentColor"/><circle cx="3" cy="18" r="1.5" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <div class="flex items-center gap-3 flex-1 min-w-44">
+        <span class="text-xs text-slate-400 font-medium whitespace-nowrap">Min Profit</span>
+        <input type="range" id="min-profit-slider" min="0.5" max="10" step="0.5" value="0.5" oninput="updateSlider()" />
+        <span id="min-profit-val" class="text-xs font-mono w-10 text-right" style="color:var(--cyan)">0.5%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400 font-medium whitespace-nowrap">Stake</span>
+        <div class="flex">
+          <span class="stake-prefix">$</span>
+          <input type="number" id="global-stake" class="stake-input" value="100" min="1" oninput="applyFilters()" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARDS AREA -->
+  <div id="cards-area"></div>
+
+</div>
+
+<script>
+var BOOKMAKER_URLS={fanduel:'https://www.fanduel.com/sportsbook',draftkings:'https://sportsbook.draftkings.com',betmgm:'https://sports.betmgm.com',caesars:'https://www.caesars.com/sportsbook-and-casino',pointsbet_us:'https://pointsbet.com',bet365:'https://www.bet365.com',unibet_uk:'https://www.unibet.co.uk',unibet_us:'https://www.unibet.com',skybet:'https://www.skybet.com',paddypower:'https://www.paddypower.com',coral:'https://www.coral.co.uk',ladbrokes_au:'https://www.ladbrokes.com.au',ladbrokes:'https://www.ladbrokes.com',williamhill:'https://www.williamhill.com',boylesports:'https://www.boylesports.com',smarkets:'https://smarkets.com',onexbet:'https://1xbet.com',neds:'https://www.neds.com.au',sportsbet:'https://www.sportsbet.com.au',betclic_fr:'https://www.betclic.fr',winamax_fr:'https://www.winamax.fr',parionssport_fr:'https://www.parionssport.fdj.fr',codere_it:'https://www.codere.it'};
+
+var BOOKIE_COLORS={fanduel:['#1e88e5','#0d47a1'],draftkings:['#ff6b35','#c44d1a'],betmgm:['#c8a000','#8a6d00'],caesars:['#4cc9f0','#4361ee'],pointsbet_us:['#c62828','#7b0000'],bet365:['#00a651','#006e35'],unibet_uk:['#00a651','#006e35'],unibet_us:['#00a651','#006e35'],skybet:['#0033a0','#001d5c'],paddypower:['#00a651','#006e35'],coral:['#e53935','#9c0000'],ladbrokes_au:['#0033a0','#001d5c'],ladbrokes:['#0033a0','#001d5c'],williamhill:['#003087','#001040'],boylesports:['#00a651','#006e35'],smarkets:['#7c3aed','#4c1d95'],onexbet:['#0ea5e9','#0369a1'],neds:['#f59e0b','#b45309'],sportsbet:['#3b82f6','#1d4ed8'],betclic_fr:['#e53935','#9c0000'],winamax_fr:['#f97316','#c2410c'],parionssport_fr:['#059669','#065f46'],codere_it:['#6366f1','#3730a3']};
+
+var SPORT_FILTERS=[{label:'All',key:'all'},{label:'Basketball',key:'basketball'},{label:'Baseball',key:'baseball'},{label:'Hockey',key:'icehockey'},{label:'Soccer',key:'soccer'},{label:'MMA',key:'mma'},{label:'Cricket',key:'cricket'},{label:'Rugby',key:'rugby'},{label:'AFL',key:'aussierules'}];
+
+var allOpportunities=[];
+var previousIds=new Set();
+var currentIds=new Set();
+var isConnected=false;
+var lastUpdateTime=null;
+var updateTimerInterval=null;
+var retryTimeout=null;
+var currentView='grid';
+var activeSport='all';
+var apiUsage=null;
+var hasReceivedData=false;
+var ws=null;
+
+// Init sport pills
+function initSportPills(){
+  var c=document.getElementById('sport-pills');
+  c.innerHTML=SPORT_FILTERS.map(function(f){
+    return '<button class="filter-pill'+(f.key===activeSport?' active':'')+'" onclick="setSport(\''+f.key+'\')">'+f.label+'</button>';
+  }).join('');
+}
+
+function setSport(key){
+  activeSport=key;
+  document.querySelectorAll('.filter-pill').forEach(function(el){
+    var lbl=SPORT_FILTERS.find(function(f){return f.key===key;});
+    el.classList.toggle('active',lbl&&el.textContent.trim()===lbl.label);
+  });
+  applyFilters();
+}
+// WebSocket
+function connectWS(){
+  if(ws){try{ws.close();}catch(e){}}
+  try{ws=new WebSocket('ws://localhost:3000');}catch(e){onWSError();return;}
+  ws.onopen=function(){
+    isConnected=true;
+    setStatus(true);
+    document.getElementById('offline-banner').classList.remove('show');
+    if(retryTimeout){clearTimeout(retryTimeout);retryTimeout=null;}
+  };
+  ws.onmessage=function(e){
+    try{
+      var msg=JSON.parse(e.data);
+      if(msg.type==='opportunities'){
+        previousIds=new Set(currentIds);
+        currentIds=new Set((msg.data||[]).map(function(o){return o.id;}));
+        allOpportunities=msg.data||[];
+        apiUsage=msg.apiUsage||null;
+        lastUpdateTime=Date.now();
+        hasReceivedData=true;
+        updateApiCredits();
+        updateStats();
+        updateTicker();
+        applyFilters();
+        startUpdateTimer();
+      }
+    }catch(err){console.warn('WS parse error',err);}
+  };
+  ws.onerror=function(){onWSError();};
+  ws.onclose=function(){onWSError();};
+}
+
+function onWSError(){
+  isConnected=false;
+  setStatus(false);
+  document.getElementById('offline-banner').classList.add('show');
+  if(!retryTimeout){retryTimeout=setTimeout(function(){retryTimeout=null;connectWS();},5000);}
+}
+
+function setStatus(online){
+  var dot=document.getElementById('status-dot');
+  var txt=document.getElementById('status-text');
+  dot.className='status-dot '+(online?'live':'offline');
+  txt.textContent=online?'LIVE':'OFFLINE';
+  txt.style.color=online?'var(--green)':'#f87171';
+}
+
+// Update timer
+function startUpdateTimer(){
+  if(updateTimerInterval)clearInterval(updateTimerInterval);
+  document.getElementById('update-timer').classList.remove('hidden');
+  updateTimerInterval=setInterval(function(){
+    if(!lastUpdateTime)return;
+    var s=Math.floor((Date.now()-lastUpdateTime)/1000);
+    document.getElementById('update-seconds').textContent=s;
+  },1000);
+}
+
+function updateApiCredits(){
+  if(!apiUsage)return;
+  var w=document.getElementById('api-credits-wrap');
+  w.classList.remove('hidden');
+  document.getElementById('credits-val').textContent=apiUsage.remaining!==undefined?apiUsage.remaining:'—';
+}
+
+// Stats
+function updateStats(){
+  var filtered=allOpportunities;
+  document.getElementById('stat-count').textContent=filtered.length;
+  if(filtered.length===0){
+    document.getElementById('stat-best').textContent='—';
+    document.getElementById('stat-avg').textContent='—';
+    return;
+  }
+  var profits=filtered.map(function(o){return o.profit;});
+  var best=Math.max.apply(null,profits);
+  var avg=profits.reduce(function(a,b){return a+b;},0)/profits.length;
+  document.getElementById('stat-best').textContent=best.toFixed(2)+'%';
+  document.getElementById('stat-avg').textContent=avg.toFixed(2)+'%';
+}
+
+// Ticker
+function updateTicker(){
+  var el=document.getElementById('ticker-text');
+  if(!allOpportunities.length){el.textContent='No arbitrage opportunities found right now.';return;}
+  var sorted=[].concat(allOpportunities).sort(function(a,b){return b.profit-a.profit;});
+  el.textContent=sorted.map(function(o){
+    return '⚡ '+o.match+' +'+o.profit.toFixed(2)+'% ';
+  }).join('  •  ');
+}
+
+// Slider
+function updateSlider(){
+  var v=document.getElementById('min-profit-slider').value;
+  document.getElementById('min-profit-val').textContent=v+'%';
+  applyFilters();
+}
+
+// View toggle
+function setView(v){
+  currentView=v;
+  document.getElementById('view-grid').classList.toggle('active',v==='grid');
+  document.getElementById('view-list').classList.toggle('active',v==='list');
+  applyFilters();
+}
+
+// Stake
+function getStake(){
+  var v=parseFloat(document.getElementById('global-stake').value)||100;
+  return v>0?v:100;
+}
+
+// Stake calculation for N legs
+function calcStakes(bets,totalStake){
+  var invOdds=bets.map(function(b){return 1/b.odds;});
+  var sumInv=invOdds.reduce(function(a,c){return a+c;},0);
+  var stakes=invOdds.map(function(inv){return totalStake*(inv/sumInv);});
+  var payout=stakes[0]*bets[0].odds;
+  var profit=payout-totalStake;
+  return{stakes:stakes,profit:profit};
+}
+
+// Time until
+function timeUntil(isoStr){
+  var now=Date.now();
+  var t=new Date(isoStr).getTime();
+  var diff=t-now;
+  if(diff<0)return'<span style="color:#f87171;font-weight:600;">Live now</span>';
+  var h=Math.floor(diff/3600000);
+  var m=Math.floor((diff%3600000)/60000);
+  if(h>48){var d=Math.floor(h/24);return d+'d '+(h%24)+'h';}
+  if(h>0)return h+'h '+m+'m';
+  return m+'m';
+}
+
+// Bookmaker chip color
+function bookieChipStyle(key){
+  var c=BOOKIE_COLORS[key]||['#334155','#1e293b'];
+  return'background:linear-gradient(135deg,'+c[0]+','+c[1]+');color:#fff;';
+}
+
+// Bookmaker initials
+function bookieInitials(name){
+  var words=name.replace(/[^a-zA-Z0-9 ]/g,' ').trim().split(/\s+/);
+  if(words.length>=2)return(words[0][0]+(words[1][0]||'')).toUpperCase();
+  return name.substring(0,3).toUpperCase();
+}
+
+// Bookmaker URL
+function bookieUrl(key,name){
+  if(BOOKMAKER_URLS[key])return BOOKMAKER_URLS[key];
+  return'https://www.google.com/search?q='+encodeURIComponent(name+' sportsbook');
+}
+
+// Build card HTML
+function buildCard(opp,isNew,stake){
+  var calc=calcStakes(opp.bets,stake);
+  var stakes=calc.stakes;
+  var profit=calc.profit;
+  var isHot=opp.profit>=3;
+  var flashClass=isNew?' new-flash':'';
+  var tu=timeUntil(opp.commence_time);
+
+  var legsHtml=opp.bets.map(function(bet,i){
+    var chipStyle=bookieChipStyle(bet.bookmakerKey);
+    var ini=bookieInitials(bet.bookmaker);
+    return'<div class="leg-row">'+
+      '<div class="bookie-chip" style="'+chipStyle+'">'+ini+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:0.82rem;font-weight:600;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(bet.bookmaker)+'</div>'+
+        '<div style="font-size:0.72rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(bet.outcome)+'</div>'+
+      '</div>'+
+      '<div style="text-align:right;flex-shrink:0;">'+
+        '<div class="num" style="font-size:0.88rem;font-weight:700;color:#e2e8f0;">'+bet.odds.toFixed(2)+'</div>'+
+        '<div class="num" style="font-size:0.72rem;color:var(--cyan);">$'+stakes[i].toFixed(2)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  var btnsHtml=opp.bets.map(function(bet,i){
+    var url=bookieUrl(bet.bookmakerKey,bet.bookmaker);
+    var btnCls=i===0?'bet-btn-cyan':'bet-btn-purple';
+    return'<button class="'+btnCls+'" onclick="window.open(\''+escAttr(url)+'\',\'_blank\')">Bet on '+escHtml(bet.bookmaker)+'</button>';
+  }).join('');
+
+  return'<div class="arb-card'+flashClass+'" data-id="'+escAttr(opp.id)+'">'+
+    '<div class="shimmer-layer"></div>'+
+    '<div class="card-inner">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">'+
+            '<span class="sport-badge">'+escHtml(opp.sportTitle||opp.sport)+'</span>'+
+            '<span style="font-size:0.7rem;color:#64748b;font-family:\'JetBrains Mono\',monospace;">'+tu+'</span>'+
+          '</div>'+
+          '<div style="font-size:0.92rem;font-weight:700;color:#f1f5f9;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escAttr(opp.match)+'">'+escHtml(opp.match)+'</div>'+
+        '</div>'+
+        '<div class="profit-badge'+(isHot?' hot':'')+'">'+
+          (isHot?'🔥 ':'')+'+'+opp.profit.toFixed(2)+'%'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">'+
+        legsHtml+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.12);margin-bottom:10px;">'+
+        '<div>'+
+          '<div style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Investment</div>'+
+          '<div class="num" style="font-size:0.9rem;font-weight:700;color:#e2e8f0;">$'+stake.toFixed(2)+'</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:0.68rem;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Guaranteed Profit</div>'+
+          '<div class="num" style="font-size:0.9rem;font-weight:700;color:var(--green);">+$'+profit.toFixed(2)+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+btnsHtml+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function escHtml(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s){
+  if(!s)return'';
+  return String(s).replace(/'/g,'%27').replace(/"/g,'&quot;');
+}
+
+// Apply filters and render
+function applyFilters(){
+  var search=(document.getElementById('search-input').value||'').toLowerCase();
+  var sort=document.getElementById('sort-select').value;
+  var minProfit=parseFloat(document.getElementById('min-profit-slider').value)||0.5;
+  var stake=getStake();
+
+  var filtered=allOpportunities.filter(function(o){
+    if(o.profit<minProfit)return false;
+    if(activeSport!=='all'&&!o.sport.startsWith(activeSport))return false;
+    if(search&&!o.match.toLowerCase().includes(search))return false;
+    return true;
+  });
+
+  if(sort==='profit'){
+    filtered.sort(function(a,b){return b.profit-a.profit;});
+  }else if(sort==='time'){
+    filtered.sort(function(a,b){return new Date(a.commence_time)-new Date(b.commence_time);});
+  }else if(sort==='sport'){
+    filtered.sort(function(a,b){return a.sport.localeCompare(b.sport)||b.profit-a.profit;});
+  }
+
+  renderCards(filtered,stake);
+}
+
+function renderCards(opps,stake){
+  var area=document.getElementById('cards-area');
+
+  // Loading state — first time waiting
+  if(!hasReceivedData){
+    area.innerHTML=buildSkeletons();
+    return;
+  }
+
+  // Empty state
+  if(!opps.length){
+    area.innerHTML='<div class="empty-state">'+
+      '<div style="font-size:3rem;margin-bottom:16px;">🔍</div>'+
+      '<div style="font-size:1.1rem;font-weight:600;color:#94a3b8;margin-bottom:8px;">No arbitrage opportunities found</div>'+
+      '<div style="font-size:0.875rem;color:#475569;">Try lowering the minimum profit filter or changing the sport filter.</div>'+
+    '</div>';
+    document.getElementById('stat-count').textContent='0';
+    return;
+  }
+
+  document.getElementById('stat-count').textContent=allOpportunities.length;
+
+  var layoutClass=currentView==='grid'?'grid-layout':'list-layout';
+  var html='<div class="'+layoutClass+'">';
+  opps.forEach(function(opp){
+    var isNew=!previousIds.has(opp.id)&&previousIds.size>0;
+    html+=buildCard(opp,isNew,stake);
+  });
+  html+='</div>';
+  area.innerHTML=html;
+}
+
+function buildSkeletons(){
+  var sk='<div class="grid-layout">';
+  for(var i=0;i<3;i++){
+    sk+='<div class="arb-card" style="padding:16px;">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">'+
+        '<div class="skeleton" style="height:14px;width:60px;"></div>'+
+        '<div class="skeleton" style="height:22px;width:70px;border-radius:20px;"></div>'+
+      '</div>'+
+      '<div class="skeleton" style="height:16px;width:75%;margin-bottom:12px;"></div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);">'+
+          '<div class="skeleton" style="width:34px;height:34px;border-radius:8px;flex-shrink:0;"></div>'+
+          '<div style="flex:1;"><div class="skeleton" style="height:12px;width:80%;margin-bottom:6px;"></div><div class="skeleton" style="height:10px;width:50%;"></div></div>'+
+          '<div><div class="skeleton" style="height:14px;width:36px;margin-bottom:4px;"></div><div class="skeleton" style="height:10px;width:30px;"></div></div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);">'+
+          '<div class="skeleton" style="width:34px;height:34px;border-radius:8px;flex-shrink:0;"></div>'+
+          '<div style="flex:1;"><div class="skeleton" style="height:12px;width:70%;margin-bottom:6px;"></div><div class="skeleton" style="height:10px;width:45%;"></div></div>'+
+          '<div><div class="skeleton" style="height:14px;width:36px;margin-bottom:4px;"></div><div class="skeleton" style="height:10px;width:30px;"></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="skeleton" style="height:44px;border-radius:8px;margin-bottom:10px;"></div>'+
+      '<div style="display:flex;gap:6px;">'+
+        '<div class="skeleton" style="height:34px;flex:1;border-radius:8px;"></div>'+
+        '<div class="skeleton" style="height:34px;flex:1;border-radius:8px;"></div>'+
+      '</div>'+
+    '</div>';
+  }
+  sk+='</div>';
+  return sk;
+}
+
+// Refresh button
+function refreshNow(){
+  var icon=document.getElementById('refresh-icon');
+  icon.classList.add('spinning');
+  fetch('http://localhost:3000/api/refresh',{method:'POST'})
+    .then(function(){setTimeout(function(){icon.classList.remove('spinning');},800);})
+    .catch(function(){icon.classList.remove('spinning');});
+}
+
+// Boot
+initSportPills();
+renderCards([],100); // show skeletons
+connectWS();
+</script>
+</body>
+</html>
