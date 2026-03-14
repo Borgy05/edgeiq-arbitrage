@@ -22,29 +22,21 @@ const MIN_PROFIT = parseFloat(process.env.MIN_PROFIT_THRESHOLD) || 0.5;
 // Sports to scan — all active non-outright sports
 // We fetch these dynamically on startup
 // ─────────────────────────────────────────────
+// Only scan the highest-value sports to preserve API quota
+// Each sport = 1 API request. At 500 req/month, scan ~10 sports every 10 minutes = ~2160 req/month
 const PRIORITY_SPORTS = [
   'basketball_nba',
   'basketball_ncaab',
-  'americanfootball_ncaaf',
   'baseball_mlb',
   'baseball_mlb_preseason',
   'icehockey_nhl',
   'soccer_epl',
-  'soccer_uefa_champs_league',
   'soccer_spain_la_liga',
   'soccer_germany_bundesliga',
-  'soccer_italy_serie_a',
-  'soccer_france_ligue_one',
-  'soccer_efl_champ',
   'mma_mixed_martial_arts',
-  'boxing_boxing',
-  'tennis_atp_french_open',
-  'tennis_wta_french_open',
-  'rugbyleague_nrl',
-  'rugbyunion_six_nations',
-  'cricket_ipl',
   'aussierules_afl',
-  'basketball_euroleague',
+  'cricket_ipl',
+  'rugbyleague_nrl',
 ];
 
 // ─────────────────────────────────────────────
@@ -174,12 +166,8 @@ async function refreshOpportunities() {
       .filter(s => s.active && !s.has_outrights && PRIORITY_SPORTS.includes(s.key))
       .map(s => s.key);
 
-    // Also include any active sport not in our list (catch-all)
-    const extraSports = allSports
-      .filter(s => s.active && !s.has_outrights && !PRIORITY_SPORTS.includes(s.key))
-      .map(s => s.key);
-
-    const sportsToCheck = [...activeSports, ...extraSports];
+    // Only scan priority sports — do NOT scan all sports, it burns quota
+    const sportsToCheck = activeSports;
     console.log(`Checking ${sportsToCheck.length} sports for arbitrage...`);
 
     const allOpportunities = [];
